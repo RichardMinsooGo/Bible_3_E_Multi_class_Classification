@@ -259,9 +259,6 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 
 from tensorflow.keras.models import load_model
 
-from tensorflow import keras
-from tensorflow.keras import layers
-
 '''
 M02. [PASS] TPU Initialization
 '''
@@ -283,18 +280,10 @@ M04. [PASS] Open "strategy.scope(  )"
 '''
 M05. Build NN model
 '''
-# initialize and compile model within strategy scope
-
-# Input for variable-length sequences of integers
-inputs = keras.Input(shape=(None,), dtype="int32")
-# Embed each integer in a embedding_dim-dimensional vector
-x = layers.Embedding(vocab_size, embedding_dim)(inputs)
-# Add 2 bidirectional LSTMs
-x = layers.Bidirectional(layers.LSTM(hidden_size, return_sequences=True))(x)
-x = layers.Bidirectional(layers.LSTM(hidden_size))(x)
-# Add a classifier
-outputs = layers.Dense(output_dim, activation='softmax')(x)
-model = keras.Model(inputs, outputs)
+model = Sequential()
+model.add(Embedding(vocab_size, embedding_dim))
+model.add(LSTM(hidden_size, dropout=0.2, recurrent_dropout=0.2))
+model.add(Dense(output_dim, activation='softmax'))
 
 '''
 M06. Optimizer
@@ -379,4 +368,3 @@ pred = model.predict(padded)
 labels = ['World', 'Sports', 'Business', 'Sci_Tech']
 # “World”, “Sports”, “Business”, “Sci_Tech”
 print(pred, labels[np.argmax(pred)])
-    
