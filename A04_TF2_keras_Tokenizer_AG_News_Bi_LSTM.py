@@ -1,6 +1,26 @@
-from IPython.display import clear_output 
-clear_output()
+'''
+Data Engineering
+'''
 
+'''
+D01. Import Libraries for Data Engineering
+'''
+import re
+import numpy as np
+from sklearn.model_selection import train_test_split    
+import matplotlib.pyplot as plt
+import tensorflow as tf
+import unicodedata
+
+print("Tensorflow version {}".format(tf.__version__))
+import random
+SEED = 1234
+tf.random.set_seed(SEED)
+AUTO = tf.data.experimental.AUTOTUNE
+
+'''
+D02. Import AG News Dataset from Auther's gdrive
+'''
 # AG-News dataset download from Auther's Github repository
 
 # Clone from Github Repository
@@ -11,26 +31,24 @@ clear_output()
 
 !unzip "/content/AG_News/AG_news.zip" -d "/content/"
 
-import re
-import numpy as np
-from sklearn.model_selection import train_test_split    
-import matplotlib.pyplot as plt
-import tensorflow as tf
-import unicodedata
+from IPython.display import clear_output 
+clear_output()
 
-print("Tensorflow version {}".format(tf.__version__))
-tf.random.set_seed(1234)
-AUTO = tf.data.experimental.AUTOTUNE
 
-# 1. Tokenizer Install & import
-# Keras Tokenizer는 tensorflow 2.X 에서 기본으로 제공하는 tokenizer이며, word level tokenizer이다. 이는 별도의 설치가 필요 없다.
+'''
+D03. [PASS] Tokenizer Install & import
+''' 
+# Keras Tokenizer is a tokenizer provided by default in tensorflow 2.X and is a word level tokenizer. It does not require a separate installation.
 
-# 2. Copy or load raw data to Colab
-max_len = 120
-BATCH_SIZE  = 128
-BUFFER_SIZE = 20000
+'''
+D04. Define Hyperparameters for Data Engineering
+'''
+max_len = 120  # cut texts after this number of words (among top vocab_size most common words)
 
-import shutil
+'''
+D05. Load and modifiy to pandas dataframe
+'''
+
 import pandas as pd
 
 pd.set_option('display.max_colwidth', 100)
@@ -53,8 +71,18 @@ test_df.rename(columns = {'Class Index':'Label'}, inplace = True)
 train_df = train_df.drop(columns=['Title', 'Description'])
 test_df  = test_df.drop(columns=['Title', 'Description'])
 
-# 5. Preprocess and build list
 
+'''
+D06. [PASS] Delete duplicated data
+'''
+
+'''
+D07. [PASS] Select samples
+'''
+
+'''
+D08. Preprocess and build list
+'''
 def preprocess_func(sentence):
     sentence = sentence.lower().strip()
     # creating a space between a word and the punctuation following it
@@ -82,25 +110,31 @@ def preprocess_func(sentence):
     sentence = re.sub(r"'bout", "about", sentence)
     # replacing everything with space except (a-z, A-Z, ".", "?", "!", ",")
     sentence = re.sub(r"[^a-zA-Z?.!,]+", " ", sentence)
-    sentence = sentence.strip()  
+    sentence = sentence.strip()
     return sentence
 
 train_df['document'] = train_df['document'].apply(preprocess_func)
 test_df['document']  = test_df['document'].apply(preprocess_func)
 
+'''
+D17. Split Data
+'''
+
 train_df, valid_df = train_test_split(train_df, test_size=0.2, random_state=32)
 
 train_df['Label'] = train_df['Label'].astype(int)
-y_train = train_df["Label"].to_numpy() - 1
+Y_train = train_df["Label"].to_numpy() - 1
 
 valid_df['Label'] = valid_df['Label'].astype(int)
-y_valid = valid_df["Label"].to_numpy() - 1
+Y_valid = valid_df["Label"].to_numpy() - 1
 
 test_df['Label'] = test_df['Label'].astype(int)
-y_test = test_df["Label"].to_numpy() - 1
+Y_test = test_df["Label"].to_numpy() - 1
 
+'''
+D09. Add <SOS>, <EOS> for source and target
+'''
 
-# 6. Tokenizer and Vocab define
 train_document = train_df['document']
 valid_document = valid_df['document']
 test_document  = test_df['document']
@@ -110,19 +144,25 @@ print(train_document[:10])
 train_sentence  = train_document.apply(lambda x: "<SOS> " + str(x))
 valid_sentence  = valid_document.apply(lambda x: "<SOS> " + str(x))
 
+'''
+D10. Define tokenizer
+'''
+
 filters = '!"#$%&()*+,-./:;=?@[\\]^_`{|}~\t\n'
 oov_token = '<unk>'
 
-# Define tokenizer
 SRC_tokenizer = tf.keras.preprocessing.text.Tokenizer(filters = filters, oov_token=oov_token)
 
 SRC_tokenizer.fit_on_texts(train_sentence)
 
 vocab_size = len(SRC_tokenizer.word_index) + 1
 
-print('Encoder 단어 집합의 크기 :',vocab_size)
+print('Word set size of Encoder :',vocab_size)
 
-# 7. Tokenizer test
+'''
+D11. Tokenizer test
+'''
+
 lines = [
   "It is winter and the weather is very cold.",
   "Will this Christmas be a white Christmas?",
@@ -135,11 +175,17 @@ for line in lines:
     print("txt_2_ids :", txt_2_ids)
     print("ids_2_txt :", ids_2_txt[0],"\n")
 
-# 8. Tokenize    
-# 토큰화 / 정수 인코딩 / 시작 토큰과 종료 토큰 추가 / 패딩
+'''
+D12. Tokenize
+'''
+# tokenize / encode integers / add start and end tokens / padding
 train_tkn_inputs = SRC_tokenizer.texts_to_sequences(train_sentence)
 valid_tkn_inputs = SRC_tokenizer.texts_to_sequences(valid_sentence)
 test_tkn_inputs  = SRC_tokenizer.texts_to_sequences(test_document)
+
+'''
+D13. [EDA] Explore the tokenized datasets
+'''
 
 len_result = [len(s) for s in train_tkn_inputs]
 
@@ -152,33 +198,63 @@ plt.subplot(1,2,2)
 plt.hist(len_result, bins=50)
 plt.show()
 
-# 9. Pad sequences
-# 패딩
-X_train = tf.keras.preprocessing.sequence.pad_sequences(train_tkn_inputs,  maxlen=max_len, padding='post', truncating='post')
-X_valid = tf.keras.preprocessing.sequence.pad_sequences(valid_tkn_inputs,  maxlen=max_len, padding='post', truncating='post')
-X_test  = tf.keras.preprocessing.sequence.pad_sequences(test_tkn_inputs,   maxlen=max_len, padding='post', truncating='post')
+'''
+D14. Pad sequences
+'''
 
-# 10. Data type define
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+
+X_train = pad_sequences(train_tkn_inputs,  maxlen=max_len, padding='post', truncating='post')
+X_valid = pad_sequences(valid_tkn_inputs,  maxlen=max_len, padding='post', truncating='post')
+X_test  = pad_sequences(test_tkn_inputs,   maxlen=max_len, padding='post', truncating='post')
+
+'''
+D15. Data type define
+'''
 X_train = tf.cast(X_train, dtype=tf.int64)
 X_valid = tf.cast(X_valid, dtype=tf.int64)
 X_test  = tf.cast(X_test, dtype=tf.int64)
 
-# 11. Check tokenized data
+'''
+D16. [EDA] Explore the Tokenized datasets
+'''
 print('Training input(shape)   :', X_train.shape)
-print('Training output(len)    :', len(y_train))
+print('Training output(len)    :', len(Y_train))
 print('Validation input(shape) :', X_valid.shape)
-print('Validation output(len)  :', len(y_valid))
+print('Validation output(len)  :', len(Y_valid))
 print('Testing input(shape)    :', X_test.shape)
-print('Testing output(len)     :', len(y_test))
+print('Testing output(len)     :', len(Y_test))
 
 # 0번째 샘플을 임의로 출력
 print(X_train[0])
 print(X_valid[0])
 print(X_test[0])
 
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.models import Sequential
+'''
+D17. Split Data
+'''
+# Split was done at the previous step
+
+'''
+D18. [PASS] Build dataset
+'''
+# For eager mode, it is done at the "model.fit"
+
+'''
+D19. [PASS] Define some useful parameters for further use
+'''
+
+'''
+Model Engineering
+'''
+
+'''
+M01. Import Libraries for Model Engineering
+'''
+
+from tensorflow.keras.models import Model, Sequential
 from tensorflow.keras.layers import Dense, LSTM, Embedding
+from tensorflow.keras import optimizers
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 
 from tensorflow.keras.models import load_model
@@ -186,9 +262,27 @@ from tensorflow.keras.models import load_model
 from tensorflow import keras
 from tensorflow.keras import layers
 
-embedding_dim = 256
-hidden_units = 128
+'''
+M02. [PASS] TPU Initialization
+'''
 
+'''
+M03. Define Hyperparameters for Model Engineering
+'''
+embedding_dim = 256
+hidden_size = 128
+output_dim = 4  # output layer dimensionality = num_classes
+EPOCHS = 20
+batch_size = 100
+learning_rate = 5e-4
+
+'''
+M04. [PASS] Open "strategy.scope(  )"
+'''
+
+'''
+M05. Build NN model
+'''
 # initialize and compile model within strategy scope
 
 # Input for variable-length sequences of integers
@@ -196,27 +290,59 @@ inputs = keras.Input(shape=(None,), dtype="int32")
 # Embed each integer in a embedding_dim-dimensional vector
 x = layers.Embedding(vocab_size, embedding_dim)(inputs)
 # Add 2 bidirectional LSTMs
-x = layers.Bidirectional(layers.LSTM(hidden_units, return_sequences=True))(x)
-x = layers.Bidirectional(layers.LSTM(hidden_units))(x)
+x = layers.Bidirectional(layers.LSTM(hidden_size, return_sequences=True))(x)
+x = layers.Bidirectional(layers.LSTM(hidden_size))(x)
 # Add a classifier
-outputs = layers.Dense(4, activation="softmax")(x)
+outputs = layers.Dense(output_dim, activation='softmax')(x)
 model = keras.Model(inputs, outputs)
-model.compile(optimizer='adam', loss = 'sparse_categorical_crossentropy', metrics = ['accuracy'])
+
+'''
+M06. Optimizer
+'''
+optimizer = optimizers.Adam(learning_rate=learning_rate)
+
+'''
+M07. Model Compilation - model.compile
+'''
+model.compile(optimizer=optimizer, loss = 'sparse_categorical_crossentropy',
+              metrics = ['accuracy'])
 
 model.summary()
-es = EarlyStopping(monitor = 'val_loss', mode = 'min', verbose = 1, patience = 3)
+
+'''
+M08. EarlyStopping
+'''
+es = EarlyStopping(monitor = 'val_loss', mode = 'min', verbose = 1, patience = 8)
+
+'''
+M09. ModelCheckpoint
+'''
 mc = ModelCheckpoint('best_model.h5', monitor = 'val_accuracy', mode = 'max', verbose = 1, save_best_only = True)
-history = model.fit(X_train, y_train, epochs = 20, validation_data = (X_valid, y_valid), callbacks=[es, mc])
 
+'''
+M10. Train and Validation - `model.fit`
+'''
+history = model.fit(X_train, Y_train, epochs = EPOCHS,
+                    batch_size=batch_size,
+                    validation_data = (X_valid, Y_valid),
+                    verbose=1,
+                    callbacks=[es, mc])
+
+'''
+M11. Assess model performance
+'''
 loaded_model = load_model('best_model.h5')
-print("\n 테스트 정확도: %.4f" % (loaded_model.evaluate(X_test, y_test)[1]))
+print("\n Test Accuracy: %.4f" % (loaded_model.evaluate(X_test, Y_test)[1]))
 
+'''
+M12. [Opt] Plot Loss and Accuracy
+'''
 history_dict = history.history
 history_dict.keys()
 
-acc = history_dict['accuracy']
-val_acc = history_dict['val_accuracy']
-loss = history_dict['loss']
+acc      = history_dict['accuracy']
+val_acc  = history_dict['val_accuracy']
+loss     = history_dict['loss']
 val_loss = history_dict['val_loss']
 
 epochs = range(1, len(acc) + 1)
@@ -242,6 +368,9 @@ plt.legend(loc='lower right')
 
 plt.show()
 
+'''
+M13. [Opt] Training result test for Code Engineering
+'''
 
 txt = ["Beer Brewer Buying	Mergers and acquisitions in the beer industry have been hot this year. Expect it to get hotter."]
 seq = SRC_tokenizer.texts_to_sequences(txt)
